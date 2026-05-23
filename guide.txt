@@ -1,0 +1,49 @@
+picoCPU - design notes
+
+Goal: call a function inside another process from outside, without
+injecting anything. Read the function's bytes via ReadProcessMemory,
+decode them, run them in an emulated CPU, get the same return value
+the function would have produced in the target process.
+
+x86-64 only. Windows only. Userland only. No SMM, no devices, no
+multi-arch. Interpreter, not JIT.
+
+Workflow:
+  1. Resolve the function's absolute address in the foreign process.
+  2. Set up emulated arg regs per Win64 ABI (RCX, RDX, R8, R9 for
+     integer/pointer, XMM0-XMM3 for floats).
+  3. Push a sentinel return address on a synthetic guest stack so the
+     outermost RET halts the dispatcher.
+  4. Read the function bytes via RPM, hand them to the decoder.
+  5. Run the resulting IR through the interpreter until the sentinel
+     RET pops, or a fault, or instruction limit.
+  6. Compare RAX (and whatever else) against what the real CPU would
+     have computed.
+
+Subsystems needed for the above to actually work on real targets:
+  - decoder (bytes -> IR)
+  - register file
+  - interpreter with one handler per opcode class
+  - memory provider abstraction (RPM-backed for live, file-backed for
+    static PE images, fake-vector-backed for unit tests)
+  - shadow pages with COW + self-modifying-code notification
+  - L1 / L2 / L3 caches over the memory provider so we don't hit RPM
+    per byte
+  - block cache (decode once, run many times)
+  - branch target cache
+  - hooks (block, code, memr, memw, insn, fault)
+  - heap manager for guest-side allocations
+  - fault model
+  - logging
+
+Robustness targets:
+  - simple mixer
+  - functions with real stack frames
+  - polymorphic (same semantics, junk-insn padding, register-allocation
+    shuffle)
+  - obfuscated (control-flow flattening, state-machine dispatch, opaque
+    predicates)
+  - self-modifying code
+  - real CRT functions from ucrtbase.dll via the PE loader path
+
+All under a millisecond per call for normal 200-500-insn functions.

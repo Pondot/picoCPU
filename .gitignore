@@ -1,0 +1,28 @@
+build/
+.vs/
+*.user
+*.suo
+out/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.exe
+*.dll
+*.log
+
+# Excluded subdirs - these are separate projects / reference material,
+# not part of picoCPU.
+0xHypervisor*/
+unicorn-2.1.4/
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
