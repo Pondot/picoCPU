@@ -4,42 +4,6 @@ x86-64 emulator. Reads a function's bytes from another process, runs them in
 its own CPU, returns what the function would've returned. No injection, no
 debugger attach, no writes to the target.
 
-Build:
-
-```
-build.bat Release
-```
-
-Run the test suite:
-
-```
-build\Release\bin\tests_unit.exe
-bash run_gates.sh
-bash run_pe_gates.sh
-```
-
-## How it works
-
-```
-target.exe                          picoCPU
-   target_fn(0x1234) -> 0x1f288...     OpenProcess + RPM target_fn bytes
-                                       decode -> IR
-                                       run inside emulated CPU
-                                       returns 0x1f288...  (bit-exact)
-```
-
-That's the whole thing. The target never knows.
-
-## Status
-
-```
-unit tests:           93 / 93
-live gates:            9 / 9
-real ucrtbase funcs:  19 / 19 + 3 IAT-stub
-decoder fuzz:         ~1M random byte inputs, 0 crashes
-perf:                 ~0.5us  clean mixer
-                      ~10us   heavy obfuscation
-```
 
 ## What it can do
 
@@ -70,37 +34,6 @@ perf:                 ~0.5us  clean mixer
 - Studying VM-protected code (VMProtect/Themida-style dispatch loops) at
   the IR level
 
-## Architecture
-
-```
-src/
-  host/         Windows-specific. OpenProcess, RPM, TEB lookup, PE parsing.
-  emu/          Host-agnostic core. Decoder, IR, CPU state, memory, caches,
-                dispatcher, handlers, hooks, logger.
-  target/       target.exe with functions to be emulated.
-  tester/       Driver: attach by PID or load PE, run a function, diff
-                against native.
-tests/unit/     93 unit tests.
-math_test/      Standalone Ackermann + Zeta target you can ship to anyone
-                with their own emulator.
-```
-
-## Two modes
-
-**Live process** (functions in a running .exe):
-
-```
-build\Release\bin\target.exe
-build\Release\bin\tester.exe --pid <PID> --addr 0xADDR --bytes 96 \
-    --emulate --seed 1234 --expected 0x1f28819613862b87
-```
-
-**Static PE** (functions in a .exe / .dll on disk):
-
-```
-build\Release\bin\tester.exe --pe-file C:\Windows\System32\ucrtbase.dll \
-    --fn strlen --input-str "hello" --expected 5
-```
 
 ## Performance
 
@@ -122,26 +55,6 @@ Riemann zeta(2) with N=10000 (10K SSE FP loop iterations)
 
 L3 RPM fetches are usually 3 to 6 per function call. After that, every byte
 the emulator reads comes out of L1.
-
-## Layout
-
-```
-.
-  CMakeLists.txt
-  build.bat            sets up MSVC env, runs cmake + ninja
-  guide.txt            spec
-  run_gates.sh         run all 9 live target.exe gates
-  run_pe_gates.sh      run the real-binary ucrtbase.dll suite
-  src/                 source
-  tests/unit/          unit tests
-  math_test/           portable Ackermann + Zeta benchmark
-```
-
-## Build deps
-
-- MSVC 2022 (any edition: Community / Pro / Enterprise / BuildTools)
-- CMake 3.20+
-- Ninja
 
 build.bat finds these automatically via `vswhere` and `where`. If you need
 to override, set `VCVARS`, `CMAKE`, or `NINJA` env vars before running it.
